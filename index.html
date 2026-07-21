@@ -8,6 +8,45 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module">
+      const isLocalDev =
+        location.hostname === 'localhost' ||
+        location.hostname === '127.0.0.1' ||
+        location.port !== '';
+
+      if (isLocalDev) {
+        import('/src/main.tsx');
+      } else {
+        fetch('./dist/manifest.json')
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error(`Missing dist manifest: ${response.status}`);
+            }
+            return response.json();
+          })
+          .then((manifest) => {
+            const entry = manifest['index.html'];
+            if (!entry) {
+              throw new Error('Missing index.html entry in manifest');
+            }
+
+            for (const cssFile of entry.css || []) {
+              const link = document.createElement('link');
+              link.rel = 'stylesheet';
+              link.href = `./dist/${cssFile}`;
+              document.head.appendChild(link);
+            }
+
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.crossOrigin = 'anonymous';
+            script.src = `./dist/${entry.file}`;
+            document.head.appendChild(script);
+          })
+          .catch((error) => {
+            document.getElementById('root').innerHTML = `<pre style="padding:16px;color:#b00020;font-family:monospace;white-space:pre-wrap;">${error.message}</pre>`;
+          });
+      }
+    </script>
   </body>
 </html>

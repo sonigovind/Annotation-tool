@@ -1,0 +1,20 @@
+{
+  "index.html": {
+    "file": "assets/index-C_PNOnSh.js",
+    "name": "index",
+    "src": "index.html",
+    "isEntry": true,
+    "dynamicImports": [
+      "src/main.tsx"
+    ]
+  },
+  "src/main.tsx": {
+    "file": "assets/main-DU0ZC26G.js",
+    "name": "main",
+    "src": "src/main.tsx",
+    "isDynamicEntry": true,
+    "css": [
+      "assets/main-DCTK5CMR.css"
+    ]
+  }
+}
