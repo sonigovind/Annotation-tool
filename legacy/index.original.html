@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>पुष्पक — NE Annotation Correction Tool</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Tiro+Devanagari+Marathi&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#181D19;
+  --panel:#202620;
+  --panel-2:#262D26;
+  --rule:#39423A;
+  --paper:#FAF7EE;
+  --ink:#221D16;
+  --muted-ink:#7A7261;
+  --accent:#CC9544;
+  --accent-soft:#3A3122;
+  --accent-2:#6FA88F;
+  --danger:#D2685F;
+  --danger-soft:#3A2624;
+  --text:#E8E4D8;
+  --text-muted:#9B9686;
+  --good:#7FB088;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'IBM Plex Sans', sans-serif;
+  font-size:14px;
+  line-height:1.5;
+}
+a{color:inherit;}
+button{font-family:inherit;}
+::selection{background:var(--accent); color:#1a1a1a;}
+
+.devanagari{font-family:'Tiro Devanagari Marathi','IBM Plex Sans', serif;}
+.mono{font-family:'IBM Plex Mono', monospace;}
+
+/* ---------- header ---------- */
+header.app-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:18px 28px;
+  border-bottom:1px solid var(--rule);
+  background:linear-gradient(180deg, #1C2120, #181D19);
+}
+.brand{display:flex; align-items:baseline; gap:12px;}
+.brand .mark{
+  font-family:'Tiro Devanagari Marathi', serif;
+  font-size:26px; color:var(--accent); font-weight:700;
+}
+.brand .tagline{font-size:12px; color:var(--text-muted); letter-spacing:.04em;}
+.header-actions{display:flex; gap:8px; align-items:center;}
+
+/* ---------- buttons ---------- */
+.btn{
+  background:var(--panel-2); color:var(--text);
+  border:1px solid var(--rule); border-radius:5px;
+  padding:7px 12px; font-size:12.5px; font-weight:500;
+  cursor:pointer; transition:border-color .15s, background .15s;
+}
+.btn:hover{border-color:var(--accent); background:#2C3329;}
+.btn:active{transform:translateY(1px);}
+.btn:disabled{opacity:.4; cursor:not-allowed;}
+.btn-primary{background:var(--accent); border-color:var(--accent); color:#201A0E; font-weight:600;}
+.btn-primary:hover{background:#D9A658; border-color:#D9A658;}
+.btn-danger{background:var(--danger-soft); border-color:var(--danger); color:#F3BEB9;}
+.btn-danger:hover{background:var(--danger); color:#1a1a1a;}
+.btn-row{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;}
+.btn:focus-visible, input:focus-visible, select:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+
+input[type="file"]{display:none;}
+
+/* ---------- layout ---------- */
+.app-grid{
+  display:grid;
+  grid-template-columns: 250px 1fr 280px;
+  gap:18px;
+  padding:18px 28px;
+  align-items:start;
+}
+.right-col{
+  position:sticky;
+  top:18px;
+  max-height:calc(100vh - 36px);
+  overflow-y:auto;
+}
+.card{
+  background:var(--panel);
+  border:1px solid var(--rule);
+  border-radius:8px;
+  padding:14px;
+  margin-bottom:14px;
+}
+.card h3{
+  margin:0 0 10px 0; font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; color:var(--text-muted); font-weight:600;
+}
+
+/* ---------- canvas / manuscript paper ---------- */
+.canvas-wrap{
+  background:var(--paper); color:var(--ink);
+  border-radius:8px; border:1px solid #E4DEC9;
+  box-shadow:0 1px 0 rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.25);
+  min-height:420px;
+  padding:10px 0 30px 0;
+}
+.canvas-empty{
+  padding:60px 40px; text-align:center; color:var(--muted-ink);
+}
+.canvas-empty .big{font-size:18px; color:var(--ink); margin-bottom:8px; font-weight:600;}
+.sentence-block{
+  padding:18px 34px;
+  border-bottom:1px dashed #E2DBC4;
+}
+.sentence-block:last-child{border-bottom:none;}
+.sentence-head{
+  font-family:'IBM Plex Mono', monospace; font-size:11px;
+  color:var(--muted-ink); margin-bottom:10px; letter-spacing:.04em;
+}
+.sentence-text{
+  font-family:'Tiro Devanagari Marathi', serif;
+  font-size:23px; line-height:2.5; word-spacing:2px;
+}
+
+.word{
+  cursor:pointer; border-radius:3px; padding:1px 2px;
+  border-bottom:2px solid transparent;
+}
+.word:hover{background:#EFE8D2;}
+.word.selected{background:var(--accent); color:#201A0E; border-bottom-color:#201A0E;}
+
+.annotation{
+  cursor:pointer; position:relative; display:inline-block;
+  padding:1px 4px 2px 4px; margin:0 1px;
+  border-bottom:2px solid var(--type-color);
+  border-radius:3px;
+}
+.annotation:hover{background:rgba(0,0,0,.05);}
+.annotation.selected{background:rgba(0,0,0,.08); outline:1.5px solid var(--type-color);}
+.annotation.merge-pending{outline:2px dashed var(--danger); background:rgba(210,104,95,.12);}
+.annotation .ann-chip{
+  display:block; font-family:'IBM Plex Mono', monospace;
+  font-size:10px; color:var(--type-color); font-weight:600;
+  letter-spacing:.02em; margin-bottom:1px; line-height:1.2;
+}
+.annotation .ann-text{}
+.annotation .ann-word{
+  cursor:pointer; border-radius:2px; padding:0 1px;
+  border-bottom:1px dashed transparent; transition:background .1s;
+}
+.annotation .ann-word:hover{ background:rgba(0,0,0,.10); }
+.annotation .ann-word.selected{ background:rgba(0,0,0,.15); outline:1px solid var(--type-color); border-radius:2px; }
+.annotation .ann-word.has-punct{
+  border-bottom:1px dashed var(--danger);
+  color:var(--danger);
+}
+.stray-text{color:var(--muted-ink); padding:0 2px;}
+.unknown-tag{color:var(--danger); border-bottom:1px dotted var(--danger);}
+
+.flash{animation:flashAnim 1.2s ease;}
+@keyframes flashAnim{
+  0%{background:var(--accent);} 100%{background:transparent;}
+}
+
+/* ---------- inspector / sidebar items ---------- */
+.insp-empty{color:var(--text-muted); font-size:12.5px; line-height:1.6;}
+.insp-empty.good{color:var(--good);}
+.insp-section{margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--rule);}
+.insp-section:last-child{border-bottom:none; margin-bottom:0; padding-bottom:0;}
+.insp-label{display:block; font-size:11px; color:var(--text-muted); margin-bottom:5px; text-transform:uppercase; letter-spacing:.05em;}
+.insp-tagname{font-family:'IBM Plex Mono', monospace; font-size:14px; font-weight:600; color:var(--accent);}
+.insp-id{color:var(--text-muted); font-weight:400;}
+.insp-words{font-family:'Tiro Devanagari Marathi', serif; font-size:16px; margin-top:4px;}
+.insp-section input[type="text"], .insp-section input:not([type]), .insp-section select{
+  width:100%; padding:7px 8px; background:#1C211C; border:1px solid var(--rule);
+  color:var(--text); border-radius:5px; font-size:13px; margin-bottom:6px;
+}
+
+/* ---------- stats / validation lists ---------- */
+.stat-row{display:flex; align-items:center; justify-content:space-between; font-size:12.5px; padding:3px 0;}
+.stat-count{font-family:'IBM Plex Mono', monospace; color:var(--accent); font-weight:600;}
+.stat-divider{height:1px; background:var(--rule); margin:8px 0;}
+.dot{width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px;}
+
+.val-list{max-height:220px; overflow-y:auto;}
+.val-item{
+  font-size:12px; padding:6px 7px; border-radius:5px; margin-bottom:4px;
+  cursor:pointer; line-height:1.4; border:1px solid transparent;
+}
+.val-item:hover{border-color:var(--rule); background:var(--panel-2);}
+.val-error{color:#F3BEB9;}
+.val-warn{color:#E8CB9C;}
+.val-suggest{color:#B9CFE8;}
+
+/* ---------- settings ---------- */
+details.settings summary{cursor:pointer; font-size:12px; color:var(--text-muted); margin-bottom:8px;}
+details.settings textarea{
+  width:100%; background:#1C211C; border:1px solid var(--rule); color:var(--text);
+  border-radius:5px; padding:7px; font-family:'IBM Plex Mono', monospace; font-size:11.5px;
+  margin-bottom:6px; resize:vertical;
+}
+
+/* ---------- log strip ---------- */
+.log-card{margin:0 28px 24px 28px;}
+.log-list{max-height:150px; overflow-y:auto;}
+.log-item{
+  font-size:12px; padding:4px 0; border-bottom:1px solid var(--rule);
+  display:flex; gap:10px;
+}
+.log-time{font-family:'IBM Plex Mono', monospace; color:var(--text-muted); flex-shrink:0;}
+
+/* ---------- legend ---------- */
+.legend{display:flex; flex-wrap:wrap; gap:6px 10px; font-size:11px; color:var(--text-muted);}
+.legend span{display:flex; align-items:center; gap:4px;}
+
+@media (max-width:980px){
+  .app-grid{grid-template-columns:1fr;}
+  .right-col{position:static; max-height:none; overflow-y:visible;}
+}
+
+/* ---------- inline split picker ---------- */
+.split-picker{
+  background:#1C211C; border:1px solid var(--rule);
+  border-radius:6px; padding:10px; margin-top:8px;
+}
+.split-picker-label{
+  font-size:11px; color:var(--text-muted); text-transform:uppercase;
+  letter-spacing:.05em; margin-bottom:8px; display:block;
+}
+.split-words{
+  display:flex; flex-wrap:wrap; gap:4px; align-items:center;
+  font-family:'Tiro Devanagari Marathi',serif; font-size:16px;
+}
+.split-word{
+  background:var(--panel-2); border:1px solid var(--rule);
+  border-radius:4px; padding:3px 8px; cursor:default;
+  color:var(--text);
+}
+.split-divider{
+  width:3px; height:28px; background:var(--rule); border-radius:2px;
+  cursor:pointer; transition:background .15s, transform .15s;
+  flex-shrink:0; position:relative;
+}
+.split-divider:hover{ background:var(--accent); transform:scaleX(2); }
+.split-divider.chosen{ background:var(--accent); transform:scaleX(2.5); }
+.split-type-row{ margin-top:10px; }
+.split-preview{
+  margin-top:8px; font-size:12px; color:var(--text-muted);
+  line-height:1.6;
+}
+.split-preview span{ color:var(--text); font-family:'Tiro Devanagari Marathi',serif; font-size:14px; }
+
+/* ---------- restore banner ---------- */
+.restore-banner{
+  display:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+  background:#2A3320; border-bottom:2px solid var(--accent);
+  padding:12px 28px; font-size:13px;
+}
+.restore-banner.visible{display:flex;}
+.restore-banner .rb-info{display:flex; flex-direction:column; gap:2px;}
+.restore-banner .rb-title{font-weight:600; color:var(--accent);}
+.restore-banner .rb-meta{font-size:11.5px; color:var(--text-muted);}
+.restore-banner .rb-actions{display:flex; gap:8px;}
+
+/* ---------- progress bar ---------- */
+.progress-bar-wrap{
+  display:none; padding:10px 34px 0 34px;
+}
+.progress-bar-wrap.visible{display:block;}
+.progress-label{font-size:11.5px; color:var(--muted-ink); margin-bottom:5px; font-family:'IBM Plex Mono',monospace;}
+.progress-track{
+  height:8px; background:#E2DBC4; border-radius:4px; overflow:hidden;
+}
+.progress-fill{
+  height:100%; background:var(--good); border-radius:4px;
+  transition:width .3s ease;
+}
+
+/* ---------- sentence status ---------- */
+.sentence-head{
+  display:flex; align-items:center; justify-content:space-between;
+}
+.status-btn{
+  border:none; background:transparent; cursor:pointer;
+  font-size:16px; padding:0 4px; line-height:1;
+  border-radius:4px; transition:background .1s;
+  flex-shrink:0;
+}
+.status-btn:hover{background:rgba(0,0,0,.08);}
+.sentence-block[data-status="done"]{border-left:3px solid var(--good);}
+.sentence-block[data-status="inprogress"]{border-left:3px solid var(--accent);}
+.sentence-block[data-status="none"]{border-left:3px solid transparent;}
+
+/* ---------- autosave indicator ---------- */
+.autosave-dot{
+  display:inline-block; width:7px; height:7px; border-radius:50%;
+  background:var(--good); margin-left:6px; vertical-align:middle;
+  opacity:0; transition:opacity .3s;
+}
+.autosave-dot.flash{opacity:1;}
+
+/* ---------- footer ---------- */
+.app-footer{
+  text-align:center; padding:18px 28px 26px; margin-top:6px;
+  border-top:1px solid var(--rule);
+  color:var(--text-muted); font-size:11.5px; letter-spacing:.02em;
+}
+.app-footer strong{color:var(--accent); font-weight:600;}
+</style>
+</head>
+<body>
+
+<div class="restore-banner" id="restoreBanner">
+  <div class="rb-info">
+    <span class="rb-title">💾 Saved session found</span>
+    <span class="rb-meta" id="restoreMeta"></span>
+  </div>
+  <div class="rb-actions">
+    <button class="btn btn-primary" id="restoreYesBtn">Restore my work</button>
+    <button class="btn btn-danger" id="restoreNoBtn">Start fresh</button>
+  </div>
+</div>
+
+<header class="app-header">
+  <div class="brand">
+    <span class="mark">पुष्पक</span>
+    <span class="tagline">NE ANNOTATION CORRECTION TOOL · MARATHI CORPUS</span>
+  </div>
+  <div class="header-actions">
+    <span id="fileNameLabel" style="font-size:12px;color:var(--text-muted);" class="mono"></span>
+    <span class="autosave-dot" id="autosaveDot" title="Auto-saved"></span>
+    <label class="btn btn-primary" for="fileInput">Load XML file</label>
+    <input type="file" id="fileInput" accept=".xml,text/xml,application/xml">
+    <button class="btn" id="loadSampleBtn">Load sample</button>
+    <button class="btn" id="exportXmlBtn">Export corrected XML</button>
+    <button class="btn" id="exportLogBtn">Export log</button>
+  </div>
+</header>
+
+<div class="app-grid">
+
+  <!-- LEFT COLUMN -->
+  <div class="left-col">
+    <div class="card">
+      <h3>Load text</h3>
+      <textarea id="pasteArea" placeholder="...or paste an XML fragment here" style="width:100%;height:80px;background:#1C211C;border:1px solid var(--rule);color:var(--text);border-radius:5px;padding:7px;font-family:'IBM Plex Mono',monospace;font-size:11px;"></textarea>
+      <button class="btn" id="loadPasteBtn" style="width:100%;margin-top:6px;">Load pasted XML</button>
+    </div>
+
+    <div class="card">
+      <h3>Session stats</h3>
+      <div id="stats"><div class="insp-empty">No file loaded yet.</div></div>
+    </div>
+
+    <div class="card">
+      <h3>Validation</h3>
+      <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:6px;margin-bottom:8px;cursor:pointer;">
+        <input type="checkbox" id="chkHeuristic" style="width:auto;margin:0;">
+        Check for untagged number words <span style="color:var(--text-muted);font-size:10px;">(slow on large files)</span>
+      </label>
+      <div id="validation" class="val-list"><div class="insp-empty">Load a file to see checks.</div></div>
+    </div>
+
+    <div class="card">
+      <details class="settings">
+        <summary>Tag &amp; type settings</summary>
+        <label class="insp-label">Annotation tag names (comma separated)</label>
+        <textarea id="cfgTagNames" rows="2">NUMEX, ENAMEX, TIMEX</textarea>
+        <label class="insp-label">Allowed entity types (comma separated)</label>
+        <textarea id="cfgTypes" rows="4">QUANTITY, COUNT, UNIT, DISTANCE, MONEY, AGE, PERIOD, PERSON, LOCATION, ORGANIZATION, DATE, TIME, DESIGNATION, FACILITY, GPE</textarea>
+        <button class="btn" id="applyCfgBtn" style="width:100%;">Apply settings</button>
+      </details>
+    </div>
+  </div>
+
+  <!-- CENTER COLUMN -->
+  <div class="center-col">
+    <div class="canvas-wrap" id="canvasWrap">
+      <div class="canvas-empty" id="canvasEmpty">
+        <div class="big">No file loaded</div>
+        <p>Load an XML annotation file, paste a fragment, or try the sample to see how correction works.</p>
+        <p style="font-size:12px;">Click a plain word to start a new tag. Click an existing tag to edit, split, merge, or delete it.</p>
+      </div>
+      <div class="progress-bar-wrap" id="progressWrap">
+        <div class="progress-label" id="progressLabel">0 / 0 sentences reviewed</div>
+        <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      </div>
+      <div id="canvas"></div>
+    </div>
+    <div class="card legend" style="margin-top:14px;">
+      <strong style="color:var(--text-muted);margin-right:4px;">Legend:</strong>
+      <span><span class="dot" style="background:#4F86C6"></span>COUNT</span>
+      <span><span class="dot" style="background:#3FA796"></span>UNIT</span>
+      <span><span class="dot" style="background:#CC9544"></span>QUANTITY</span>
+      <span><span class="dot" style="background:#8E6FC9"></span>DISTANCE</span>
+      <span><span class="dot" style="background:#D4654F"></span>PERSON</span>
+      <span><span class="dot" style="background:#4F9FC6"></span>LOCATION</span>
+      <span style="margin-left:auto;color:var(--text-muted);">colors auto-assign for custom types</span>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div class="right-col">
+    <div class="card">
+      <h3>Inspector</h3>
+      <div id="inspector"><div class="insp-empty">Click a word to start a new tag, or click an existing annotation to edit it.</div></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="card log-card">
+  <h3>Correction log (this session)</h3>
+  <div id="logList" class="log-list"><div class="insp-empty">No corrections yet this session.</div></div>
+</div>
+
+<footer class="app-footer">
+  <span class="devanagari">पुष्पक</span> — developed by <strong>Govind Kumar Soni</strong>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------- state ----------------
+  let xmlDoc = null;
+  let currentFileName = "annotations.xml";
+  let uidCounter = 1;
+  let uidMap = new Map();        // uid -> XML element node
+  let nodeToUid = new WeakMap(); // XML element node -> uid
+  let selectedWordUids = new Set();
+  let selectedAnnotationUid = null;
+  let mergeModeFirstUid = null;
+  let correctionLog = [];
+  let filesProcessedCount = 0;
+  let validationIssues = [];
+
+  // per-sentence progress: key = sentence label, value = "none"|"inprogress"|"done"
+  let sentenceProgress = {};
+  const LS_KEY = "pushpak_session_v1";
+  let _autoSaveTimer = null;
+
+  let config = {
+    tagNames: ["NUMEX","ENAMEX","TIMEX"],
+    allowedTypes: ["QUANTITY","COUNT","UNIT","DISTANCE","MONEY","AGE","PERIOD","PERSON","LOCATION","ORGANIZATION","DATE","TIME","DESIGNATION","FACILITY","GPE"]
+  };
+
+  const TYPE_COLORS = {
+    QUANTITY:"#CC9544", COUNT:"#4F86C6", UNIT:"#3FA796", DISTANCE:"#8E6FC9",
+    MONEY:"#4FA651", AGE:"#C9637A", PERIOD:"#C9A23F", PERSON:"#D4654F",
+    LOCATION:"#4F9FC6", ORGANIZATION:"#9F7FD1", DATE:"#6FA88F", TIME:"#E0A85B"
+  };
+  const FALLBACK_PALETTE = ["#4F86C6","#3FA796","#CC9544","#8E6FC9","#4FA651","#C9637A","#C9A23F","#D4654F","#4F9FC6","#9F7FD1"];
+
+  function colorForType(type){
+    const key = (type||"").toUpperCase();
+    if (TYPE_COLORS[key]) return TYPE_COLORS[key];
+    let hash = 0;
+    for (let i=0;i<key.length;i++) hash = (hash*31 + key.charCodeAt(i)) >>> 0;
+    return FALLBACK_PALETTE[hash % FALLBACK_PALETTE.length];
+  }
+
+  function escapeHtml(s){
+    const d = document.createElement("div");
+    d.textContent = s == null ? "" : String(s);
+    return d.innerHTML;
+  }
+
+  function tagNamesUpper(){ return config.tagNames.map(t=>t.toUpperCase()); }
+
+  function log(action){
+    correctionLog.unshift({ time: new Date().toLocaleTimeString(), action });
+    renderLog();
+  }
+
+  function renderLog(){
+    const el = document.getElementById("logList");
+    if (correctionLog.length === 0){
+      el.innerHTML = '<div class="insp-empty">No corrections yet this session.</div>';
+      return;
+    }
+    el.innerHTML = correctionLog.slice(0,300).map(l=>
+      `<div class="log-item"><span class="log-time mono">${l.time}</span><span>${escapeHtml(l.action)}</span></div>`
+    ).join("");
+  }
+
+  // ---------------- loading ----------------
+  function showCanvasState(hasDoc){
+    document.getElementById("canvasEmpty").style.display = hasDoc ? "none" : "block";
+  }
+
+  function loadXMLString(str){
+    const parser = new DOMParser();
+    let doc = parser.parseFromString(str, "application/xml");
+    let perr = doc.querySelector("parsererror");
+    if (perr){
+      const wrapped = "<ROOT>" + str + "</ROOT>";
+      doc = parser.parseFromString(wrapped, "application/xml");
+      perr = doc.querySelector("parsererror");
+      if (perr){
+        alert("Could not parse this as XML, even after attempting to auto-wrap it.\n\nCheck for unescaped characters (like a bare & or <) or mismatched tags.");
+        return;
+      }
+      log("Input was not a single well-formed XML document — auto-wrapped in <ROOT> for editing.");
+    }
+    xmlDoc = doc;
+    filesProcessedCount++;
+    selectedAnnotationUid = null;
+    selectedWordUids.clear();
+    mergeModeFirstUid = null;
+    showCanvasState(true);
+    render();
+    initMaxEntityId();
+    runValidation();
+  }
+
+  function findContainers(root){
+    const sentenceTagNames = ["SENTENCE","SENT","S"];
+    const found = Array.from(root.querySelectorAll("*")).filter(el =>
+      sentenceTagNames.includes(el.tagName.toUpperCase())
+    );
+    if (found.length > 0) return found;
+    return [root];
+  }
+
+  // ---------------- rendering ----------------
+  function render(){
+    uidMap = new Map();
+    nodeToUid = new WeakMap();
+    uidCounter = 1;
+    const canvas = document.getElementById("canvas");
+    canvas.innerHTML = "";
+    if (!xmlDoc){ showCanvasState(false); updateInspector(); updateStats(); return; }
+
+    const containers = findContainers(xmlDoc.documentElement);
+    containers.forEach((c, i) => canvas.appendChild(renderContainer(c, i)));
+    updateInspector();
+    updateStats();
+    updateProgressBar();
+  }
+
+  function renderContainer(containerEl, idx){
+    const wrap = document.createElement("div");
+    wrap.className = "sentence-block";
+
+    const isRootContainer = (containerEl === xmlDoc.documentElement);
+    const label = isRootContainer
+      ? "DOCUMENT"
+      : (containerEl.tagName + (containerEl.getAttribute("ID") ? " #" + containerEl.getAttribute("ID") : " " + (idx+1)));
+
+    const key = getSentenceKey(containerEl, idx);
+    const status = getSentenceStatus(key);
+    wrap.dataset.key = key;
+    wrap.dataset.status = status;
+
+    const head = document.createElement("div");
+    head.className = "sentence-head mono";
+
+    const headLabel = document.createElement("span");
+    headLabel.textContent = label;
+    head.appendChild(headLabel);
+
+    const statusBtn = document.createElement("button");
+    statusBtn.className = "status-btn";
+    statusBtn.title = "Click to cycle: Not reviewed → In progress → Done";
+    statusBtn.textContent = statusIcon(status);
+    statusBtn.addEventListener("click", (e) => { e.stopPropagation(); cycleSentenceStatus(key); });
+    head.appendChild(statusBtn);
+
+    wrap.appendChild(head);
+
+    const p = document.createElement("div");
+    p.className = "sentence-text";
+    Array.from(containerEl.childNodes).forEach(child => appendChildInline(p, child));
+    wrap.appendChild(p);
+
+    return wrap;
+  }
+
+  function appendChildInline(frag, child){
+    if (child.nodeType === 3){ // text node
+      const t = child.textContent;
+      if (t.trim()){
+        const span = document.createElement("span");
+        span.className = "stray-text";
+        span.textContent = t;
+        frag.appendChild(span);
+      } else if (t.length){
+        frag.appendChild(document.createTextNode(" "));
+      }
+      return;
+    }
+    if (child.nodeType !== 1) return;
+    const tag = child.tagName;
+
+    if (tag.toUpperCase() === "W"){
+      const uid = uidCounter++;
+      uidMap.set(uid, child); nodeToUid.set(child, uid);
+      const span = document.createElement("span");
+      span.className = "word" + (selectedWordUids.has(uid) ? " selected" : "");
+      span.dataset.uid = uid; span.dataset.kind = "word";
+      span.textContent = child.textContent.trim();
+      frag.appendChild(span);
+      frag.appendChild(document.createTextNode(" "));
+      return;
+    }
+
+    if (tagNamesUpper().includes(tag.toUpperCase())){
+      const uid = uidCounter++;
+      uidMap.set(uid, child); nodeToUid.set(child, uid);
+      const type = child.getAttribute("TYPE") || "?";
+      const id = child.getAttribute("ID") || "?";
+      const span = document.createElement("span");
+      let cls = "annotation";
+      if (uid === selectedAnnotationUid) cls += " selected";
+      if (uid === mergeModeFirstUid) cls += " merge-pending";
+      span.className = cls;
+      span.dataset.uid = uid; span.dataset.kind = "annotation";
+      span.style.setProperty("--type-color", colorForType(type));
+
+      const chip = document.createElement("span");
+      chip.className = "ann-chip";
+      chip.textContent = tag + ":" + type + " #" + id;
+      span.appendChild(chip);
+
+      // render each W inside annotation as individually clickable for token-split
+      const words = Array.from(child.children).filter(c => c.tagName.toUpperCase() === "W");
+      const textSpan = document.createElement("span");
+      textSpan.className = "ann-text";
+      words.forEach((w, i) => {
+        const wuid = uidCounter++;
+        uidMap.set(wuid, w); nodeToUid.set(w, wuid);
+        const wspan = document.createElement("span");
+        wspan.className = "ann-word" + (hasPunct(w.textContent.trim()) ? " has-punct" : "");
+        wspan.dataset.uid = wuid; wspan.dataset.kind = "annword";
+        wspan.textContent = w.textContent.trim();
+        textSpan.appendChild(wspan);
+        if (i < words.length - 1) textSpan.appendChild(document.createTextNode(" "));
+      });
+      span.appendChild(textSpan);
+
+      frag.appendChild(span);
+      frag.appendChild(document.createTextNode(" "));
+      return;
+    }
+
+    // unknown wrapper tag: flatten and recurse so its contents still render
+    Array.from(child.childNodes).forEach(gc => appendChildInline(frag, gc));
+  }
+
+  // ---------------- canvas interaction ----------------
+  // ---------- lightweight selection update (no DOM rebuild) ----------
+  function updateSelection(){
+    // words
+    document.querySelectorAll(".word[data-uid]").forEach(el => {
+      const uid = Number(el.dataset.uid);
+      el.classList.toggle("selected", selectedWordUids.has(uid));
+    });
+    // ann-words inside annotations
+    document.querySelectorAll(".ann-word[data-uid]").forEach(el => {
+      const uid = Number(el.dataset.uid);
+      el.classList.toggle("selected", selectedWordUids.has(uid));
+    });
+    // annotations
+    document.querySelectorAll(".annotation[data-uid]").forEach(el => {
+      const uid = Number(el.dataset.uid);
+      el.classList.toggle("selected", uid === selectedAnnotationUid);
+      el.classList.toggle("merge-pending", uid === mergeModeFirstUid);
+    });
+    updateInspector();
+    updateStats();
+  }
+
+  document.getElementById("canvas").addEventListener("click", function(e){
+    const t = e.target.closest("[data-uid]");
+    if (!t) return;
+    const uid = Number(t.dataset.uid);
+    const kind = t.dataset.kind;
+
+    if (kind === "word"){
+      if (mergeModeFirstUid !== null) return;
+      if (selectedWordUids.has(uid)) selectedWordUids.delete(uid); else selectedWordUids.add(uid);
+      selectedAnnotationUid = null;
+      updateSelection();
+    } else if (kind === "annword"){
+      if (mergeModeFirstUid !== null) return;
+      selectedWordUids.clear();
+      selectedWordUids.add(uid);
+      selectedAnnotationUid = null;
+      updateSelection();
+    } else if (kind === "annotation"){
+      if (mergeModeFirstUid !== null){
+        if (mergeModeFirstUid === uid){ mergeModeFirstUid = null; updateSelection(); return; }
+        attemptMerge(mergeModeFirstUid, uid);
+        mergeModeFirstUid = null;
+        return;
+      }
+      selectedAnnotationUid = (selectedAnnotationUid === uid) ? null : uid;
+      selectedWordUids.clear();
+      updateSelection();
+    }
+  });
+
+  // ---------------- editing operations ----------------
+
+  // cached max ID — avoids full DOM scan on every create/split
+  let _maxEntityId = 0;
+  function initMaxEntityId(){
+    _maxEntityId = 0;
+    const names = tagNamesUpper();
+    Array.from(xmlDoc.getElementsByTagName("*")).forEach(el => {
+      if (names.includes(el.tagName.toUpperCase())){
+        const id = parseInt(el.getAttribute("ID"), 10);
+        if (!isNaN(id) && id > _maxEntityId) _maxEntityId = id;
+      }
+    });
+  }
+  function nextEntityId(){ return ++_maxEntityId; }
+
+  // debounced validation — waits 400 ms after last change before running
+  let _valTimer = null;
+  function runValidationDebounced(){
+    if (_valTimer) clearTimeout(_valTimer);
+    _valTimer = setTimeout(runValidation, 400);
+  }
+
+  function changeType(uid, newType){
+    const el = uidMap.get(uid); if (!el) return;
+    const old = el.getAttribute("TYPE");
+    el.setAttribute("TYPE", newType);
+    log("Changed " + el.tagName + " #" + el.getAttribute("ID") + " type " + old + " \u2192 " + newType);
+    render(); runValidationDebounced(); scheduleAutoSave();
+  }
+
+  function deleteAnnotation(uid){
+    const el = uidMap.get(uid); if (!el) return;
+    const parent = el.parentNode;
+    const words = Array.from(el.children).filter(c => c.tagName.toUpperCase() === "W");
+    words.forEach(w => parent.insertBefore(w, el));
+    const desc = el.tagName + " #" + el.getAttribute("ID") + " (" + el.getAttribute("TYPE") + ")";
+    parent.removeChild(el);
+    log("Deleted " + desc + " — words kept as plain text");
+    selectedAnnotationUid = null;
+    render(); runValidationDebounced(); scheduleAutoSave();
+  }
+
+  function extendBoundary(uid, side){
+    const el = uidMap.get(uid); if (!el) return;
+    const parent = el.parentNode;
+    if (side === "left"){
+      let prev = el.previousSibling;
+      while (prev && prev.nodeType === 3 && !prev.textContent.trim()) prev = prev.previousSibling;
+      if (prev && prev.nodeType === 1 && prev.tagName.toUpperCase() === "W"){
+        el.insertBefore(prev, el.firstChild);
+        log("Extended " + el.tagName + " #" + el.getAttribute("ID") + " left to include \"" + prev.textContent.trim() + "\"");
+      } else { alert("No plain word to the left to extend into."); return; }
+    } else {
+      let next = el.nextSibling;
+      while (next && next.nodeType === 3 && !next.textContent.trim()) next = next.nextSibling;
+      if (next && next.nodeType === 1 && next.tagName.toUpperCase() === "W"){
+        el.appendChild(next);
+        log("Extended " + el.tagName + " #" + el.getAttribute("ID") + " right to include \"" + next.textContent.trim() + "\"");
+      } else { alert("No plain word to the right to extend into."); return; }
+    }
+    render(); runValidationDebounced(); scheduleAutoSave();
+  }
+
+  function shrinkBoundary(uid, side){
+    const el = uidMap.get(uid); if (!el) return;
+    const words = Array.from(el.children).filter(c => c.tagName.toUpperCase() === "W");
+    if (words.length <= 1){
+      alert("Only one word left in this tag — delete it instead if it should not be tagged.");
+      return;
+    }
+    const w = side === "left" ? words[0] : words[words.length-1];
+    const parent = el.parentNode;
+    parent.insertBefore(w, side === "left" ? el : el.nextSibling);
+    log("Shrank " + el.tagName + " #" + el.getAttribute("ID") + " — removed \"" + w.textContent.trim() + "\" from the " + side);
+    render(); runValidationDebounced(); scheduleAutoSave();
+  }
+
+  function openSplitPrompt(uid, words){
+    const labels = words.map((w,i) => (i+1) + ":" + w.textContent.trim()).join("   ");
+    const idxStr = prompt("Words in this tag:\n" + labels + "\n\nEnter the number of the LAST word that should stay in the FIRST part (1-" + (words.length-1) + "):");
+    if (idxStr === null) return;
+    const idx = parseInt(idxStr, 10);
+    if (isNaN(idx) || idx < 1 || idx >= words.length){ alert("Invalid split point."); return; }
+    const el = uidMap.get(uid);
+    const newType = prompt("Entity TYPE for the new second part:", el.getAttribute("TYPE") || "");
+    if (newType === null) return;
+    splitAnnotation(uid, idx, newType.trim().toUpperCase());
+  }
+
+  function splitAnnotation(uid, splitIndex, newType){
+    const el = uidMap.get(uid); if (!el) return;
+    const words = Array.from(el.children).filter(c => c.tagName.toUpperCase() === "W");
+    if (splitIndex <= 0 || splitIndex >= words.length){ alert("Invalid split point."); return; }
+    const tagName = el.tagName;
+    const origId = el.getAttribute("ID");
+    const origType = el.getAttribute("TYPE");
+    const secondId = nextEntityId();
+    const second = xmlDoc.createElement(tagName);
+    second.setAttribute("ID", String(secondId));
+    second.setAttribute("TYPE", newType || origType);
+    for (let i = splitIndex; i < words.length; i++) second.appendChild(words[i]);
+    el.parentNode.insertBefore(second, el.nextSibling);
+    log("Split " + tagName + " #" + origId + " \u2192 kept #" + origId + " (" + splitIndex + " word" + (splitIndex>1?"s":"") + ") + new #" + secondId + " (" + (newType||origType) + ")");
+    selectedAnnotationUid = null;
+    render(); runValidationDebounced(); scheduleAutoSave();
+  }
+
+  // ---------- split word token (punctuation attached to digit/word) ----------
+  const LEADING_PUNCT  = /^([(\[{""''«‹।॥'"]+)/u;
+  const TRAILING_PUNCT = /([)\]}"'»›।॥'".,;:!?]+)$/u;
+
+  function hasPunct(text){
+    return LEADING_PUNCT.test(text) || TRAILING_PUNCT.test(text);
+  }
+
+  function computePunctParts(text){
+    let rest = text;
+    const parts = [];
+    const leadM = LEADING_PUNCT.exec(rest);
+    if (leadM){ parts.push(leadM[1]); rest = rest.slice(leadM[1].length); }
+    const trailM = TRAILING_PUNCT.exec(rest);
+    if (trailM){
+      const core = rest.slice(0, rest.length - trailM[1].length);
+      if (core) parts.push(core);
+      parts.push(trailM[1]);
+    } else {
+      if (rest) parts.push(rest);
+    }
+    return parts.filter(Boolean);
+  }
+
+  function splitWordToken(uid){
+    const el = uidMap.get(uid); if (!el || el.tagName.toUpperCase() !== "W") return;
+    const text = el.textContent.trim();
+    const parts = computePunctParts(text);
+    if (parts.length < 2){ alert("No separable punctuation found in this token."); return; }
+
+    const label = parts.map((p,i)=>(i+1)+": "+p).join("   |   ");
+    const answer = prompt(
+      "Word token: " + text + "\n\n" +
+      "Will be split into:\n" + label + "\n\n" +
+      "Each part becomes its own <W> token. Click OK to confirm.",
+      "OK"
+    );
+    if (answer === null) return;
+
+    const parent = el.parentNode;
+    const newNodes = parts.map(p => {
+      const w = xmlDoc.createElement("W");
+      w.textContent = p;
+      return w;
+    });
+    newNodes.forEach(n => parent.insertBefore(n, el));
+    parent.removeChild(el);
+    log("Split word token [" + text + "] into: " + parts.join(" | "));
+    selectedWordUids.clear();
+    render(); runValidationDebounced(); scheduleAutoSave();
+  }
+
+  function attemptMerge(uid1, uid2){
+    const a = uidMap.get(uid1), b = uidMap.get(uid2);
+    if (!a || !b) return;
+    if (a.parentNode !== b.parentNode){ alert("Can only merge annotations within the same sentence."); render(); return; }
+    let first = a, second = b;
+    const pos = a.compareDocumentPosition(b);
+    if (pos & Node.DOCUMENT_POSITION_PRECEDING){ first = b; second = a; }
+    let n = first.nextSibling;
+    let adjacent = false;
+    while (n){
+      if (n === second){ adjacent = true; break; }
+      if (!(n.nodeType === 3 && !n.textContent.trim())) break;
+      n = n.nextSibling;
+    }
+    if (!adjacent){ alert("Annotations must be adjacent (no words in between) to merge."); render(); return; }
+    const newType = prompt("Merging " + first.tagName + " #" + first.getAttribute("ID") + " + " + second.tagName + " #" + second.getAttribute("ID") + ".\nEnter TYPE for the merged annotation:", first.getAttribute("TYPE") || "");
+    if (newType === null){ render(); return; }
+    const firstId = first.getAttribute("ID"), secondId = second.getAttribute("ID");
+    const secondWords = Array.from(second.children).filter(c => c.tagName.toUpperCase() === "W");
+    secondWords.forEach(w => first.appendChild(w));
+    second.parentNode.removeChild(second);
+    first.setAttribute("TYPE", newType.trim().toUpperCase() || first.getAttribute("TYPE"));
+    log("Merged #" + firstId + " + #" + secondId + " \u2192 #" + firstId + " (" + first.getAttribute("TYPE") + ")");
+    selectedAnnotationUid = null;
+    render(); runValidationDebounced(); scheduleAutoSave();
+  }
+
+  function createAnnotationFromSelection(tagName, type){
+    if (selectedWordUids.size === 0){ alert("Select one or more words first."); return; }
+    const nodes = Array.from(selectedWordUids).map(uid => uidMap.get(uid)).filter(Boolean);
+    const parent = nodes[0].parentNode;
+    if (!nodes.every(n => n.parentNode === parent)){ alert("Selected words must be in the same sentence."); return; }
+    nodes.sort((x,y) => (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1);
+
+    let cursor = nodes[0], i = 0;
+    while (cursor){
+      if (cursor.nodeType === 1){
+        if (cursor !== nodes[i]){ alert("Selected words must be contiguous (no un-selected words in between)."); return; }
+        i++;
+        if (i === nodes.length) break;
+      }
+      cursor = cursor.nextSibling;
+    }
+
+    const id = nextEntityId();
+    const el = xmlDoc.createElement(tagName);
+    el.setAttribute("ID", String(id));
+    el.setAttribute("TYPE", type);
+    parent.insertBefore(el, nodes[0]);
+    nodes.forEach(n => el.appendChild(n));
+    log("Created " + tagName + " #" + id + " (" + type + ") over: \"" + nodes.map(n=>n.textContent.trim()).join(" ") + "\"");
+    selectedWordUids.clear();
+    render(); runValidationDebounced(); scheduleAutoSave();
+  }
+
+  // ---------------- inspector ----------------
+  function emptyInspectorHTML(){
+    return '<div class="insp-empty">Click a word to start a new tag, or click an existing annotation to edit it.</div>';
+  }
+
+  function updateInspector(){
+    const panel = document.getElementById("inspector");
+    if (!xmlDoc){ panel.innerHTML = emptyInspectorHTML(); return; }
+
+    if (selectedAnnotationUid !== null){
+      const el = uidMap.get(selectedAnnotationUid);
+      if (!el){ selectedAnnotationUid = null; panel.innerHTML = emptyInspectorHTML(); return; }
+      const words = Array.from(el.children).filter(c => c.tagName.toUpperCase() === "W");
+      const isSplitting = panel.dataset.splitUid === String(selectedAnnotationUid);
+
+      panel.innerHTML =
+        '<div class="insp-section">' +
+          '<div class="insp-label">Selected annotation</div>' +
+          '<div class="insp-tagname">' + el.tagName + ' <span class="insp-id">#' + (el.getAttribute("ID")||"?") + '</span></div>' +
+          '<div class="insp-words devanagari">' + escapeHtml(words.map(w=>w.textContent.trim()).join(" ")) + '</div>' +
+        '</div>' +
+        '<div class="insp-section">' +
+          '<label class="insp-label" for="typeSelect">Entity type</label>' +
+          '<input list="typeOptions" id="typeSelect" value="' + escapeHtml(el.getAttribute("TYPE")||"") + '">' +
+          '<datalist id="typeOptions">' + config.allowedTypes.map(t=>'<option value="'+escapeHtml(t)+'">').join("") + '</datalist>' +
+          '<button class="btn btn-primary" id="saveTypeBtn" style="width:100%;">Save type</button>' +
+        '</div>' +
+        '<div class="insp-section">' +
+          '<div class="insp-label">Boundaries</div>' +
+          '<div class="btn-row">' +
+            '<button class="btn" id="extLeftBtn">\u25C0 extend left</button>' +
+            '<button class="btn" id="extRightBtn">extend right \u25B6</button>' +
+            '<button class="btn" id="shrLeftBtn">shrink left</button>' +
+            '<button class="btn" id="shrRightBtn">shrink right</button>' +
+          '</div>' +
+        '</div>' +
+
+        // ---- inline split UI ----
+        '<div class="insp-section" id="splitSection">' +
+          '<div class="insp-label">Split annotation</div>' +
+          (words.length < 2
+            ? '<div class="insp-empty">Need at least 2 words to split.</div>'
+            : '<div class="split-picker" id="splitPicker">' +
+                '<span class="split-picker-label">Click the gap where you want to split</span>' +
+                '<div class="split-words" id="splitWords">' +
+                  words.map((w,i) =>
+                    (i === 0 ? '' : '<div class="split-divider" data-after="' + (i-1) + '" title="Split here"></div>') +
+                    '<span class="split-word">' + escapeHtml(w.textContent.trim()) + '</span>'
+                  ).join("") +
+                '</div>' +
+                '<div class="split-type-row" id="splitTypeRow" style="display:none;">' +
+                  '<label class="insp-label" for="splitNewType" style="margin-top:8px;">Type for the NEW second part</label>' +
+                  '<input list="splitTypeOptions" id="splitNewType" placeholder="e.g. UNIT" style="width:100%;padding:7px 8px;background:#1C211C;border:1px solid var(--rule);color:var(--text);border-radius:5px;font-size:13px;margin-bottom:6px;">' +
+                  '<datalist id="splitTypeOptions">' + config.allowedTypes.map(t=>'<option value="'+escapeHtml(t)+'">').join("") + '</datalist>' +
+                  '<div class="split-preview" id="splitPreview"></div>' +
+                  '<button class="btn btn-primary" id="doSplitBtn" style="width:100%;margin-top:6px;">✂ Confirm split</button>' +
+                '</div>' +
+              '</div>'
+          ) +
+        '</div>' +
+
+        '<div class="insp-section">' +
+          '<div class="insp-label">Other actions</div>' +
+          '<div class="btn-row">' +
+            '<button class="btn" id="mergeBtn">Merge with\u2026</button>' +
+            '<button class="btn btn-danger" id="deleteBtn">Delete tag</button>' +
+          '</div>' +
+        '</div>';
+
+      // wire up type save
+      document.getElementById("saveTypeBtn").onclick = () => {
+        const v = document.getElementById("typeSelect").value.trim();
+        if (v) changeType(selectedAnnotationUid, v.toUpperCase());
+      };
+      document.getElementById("extLeftBtn").onclick = () => extendBoundary(selectedAnnotationUid, "left");
+      document.getElementById("extRightBtn").onclick = () => extendBoundary(selectedAnnotationUid, "right");
+      document.getElementById("shrLeftBtn").onclick = () => shrinkBoundary(selectedAnnotationUid, "left");
+      document.getElementById("shrRightBtn").onclick = () => shrinkBoundary(selectedAnnotationUid, "right");
+      document.getElementById("deleteBtn").onclick = () => {
+        if (confirm("Delete this annotation? Words will be kept as plain text.")) deleteAnnotation(selectedAnnotationUid);
+      };
+      document.getElementById("mergeBtn").onclick = () => {
+        mergeModeFirstUid = selectedAnnotationUid; selectedAnnotationUid = null; render();
+      };
+
+      // wire up inline split picker
+      if (words.length >= 2){
+        let chosenAfter = -1;
+        const uid = selectedAnnotationUid;
+
+        const dividers = panel.querySelectorAll(".split-divider");
+        const typeRow = document.getElementById("splitTypeRow");
+        const preview = document.getElementById("splitPreview");
+        const newTypeInput = document.getElementById("splitNewType");
+
+        function updateSplitPreview(){
+          if (chosenAfter < 0){ preview.innerHTML = ""; return; }
+          const part1 = words.slice(0, chosenAfter+1).map(w=>w.textContent.trim()).join(" ");
+          const part2 = words.slice(chosenAfter+1).map(w=>w.textContent.trim()).join(" ");
+          const t2 = newTypeInput.value.trim().toUpperCase() || "?";
+          preview.innerHTML =
+            "Part 1 (" + el.getAttribute("TYPE") + "): <span>" + escapeHtml(part1) + "</span><br>" +
+            "Part 2 (" + t2 + "): <span>" + escapeHtml(part2) + "</span>";
+        }
+
+        dividers.forEach(div => {
+          div.addEventListener("click", () => {
+            dividers.forEach(d => d.classList.remove("chosen"));
+            div.classList.add("chosen");
+            chosenAfter = Number(div.dataset.after);
+            typeRow.style.display = "block";
+            newTypeInput.value = el.getAttribute("TYPE") || "";
+            updateSplitPreview();
+            newTypeInput.focus();
+          });
+        });
+
+        newTypeInput && newTypeInput.addEventListener("input", updateSplitPreview);
+
+        const doSplitBtn = document.getElementById("doSplitBtn");
+        if (doSplitBtn){
+          doSplitBtn.onclick = () => {
+            if (chosenAfter < 0){ alert("Click a gap between words first to choose the split point."); return; }
+            const newType = (newTypeInput.value.trim().toUpperCase()) || el.getAttribute("TYPE");
+            splitAnnotation(uid, chosenAfter + 1, newType);
+          };
+        }
+      }
+
+    } else if (selectedWordUids.size > 0){
+      const words = Array.from(selectedWordUids).map(u => uidMap.get(u)).filter(Boolean);
+      const singleWord = selectedWordUids.size === 1 ? words[0] : null;
+      const singleText = singleWord ? singleWord.textContent.trim() : "";
+      const showSplit = singleWord && hasPunct(singleText);
+      const splitParts = showSplit ? computePunctParts(singleText) : [];
+
+      panel.innerHTML =
+        '<div class="insp-section">' +
+          '<div class="insp-label">Selected word(s)</div>' +
+          '<div class="insp-words devanagari">' + escapeHtml(words.map(w=>w.textContent.trim()).join(" ")) + '</div>' +
+        '</div>' +
+        (showSplit
+          ? '<div class="insp-section" style="background:var(--accent-soft);border-radius:6px;padding:10px;">' +
+              '<div class="insp-label" style="color:var(--accent);">⚠ Punctuation detected in token</div>' +
+              '<div style="font-size:12px;margin-bottom:8px;line-height:1.6;">This token has punctuation glued to the number/word:<br>' +
+              '<span class="devanagari" style="font-size:15px;color:var(--accent);">' + escapeHtml(singleText) + '</span><br>' +
+              'Will split into: ' + splitParts.map(p => '<strong>' + escapeHtml(p) + '</strong>').join(' + ') + '</div>' +
+              '<button class="btn btn-primary" id="splitTokenBtn" style="width:100%;margin-bottom:6px;">✂ Split punctuation off</button>' +
+            '</div>'
+          : '') +
+        '<div class="insp-section">' +
+          '<div class="insp-label">Create new annotation</div>' +
+          '<label class="insp-label" for="newTagName">Tag name</label>' +
+          '<select id="newTagName">' + config.tagNames.map(t=>'<option value="'+escapeHtml(t)+'">'+escapeHtml(t)+'</option>').join("") + '</select>' +
+          '<label class="insp-label" for="newTagType">Entity type</label>' +
+          '<input list="typeOptions2" id="newTagType" placeholder="e.g. COUNT">' +
+          '<datalist id="typeOptions2">' + config.allowedTypes.map(t=>'<option value="'+escapeHtml(t)+'">').join("") + '</datalist>' +
+          '<button class="btn btn-primary" id="createTagBtn" style="width:100%;margin-bottom:6px;">Create annotation</button>' +
+          '<button class="btn" id="clearSelBtn" style="width:100%;">Clear selection</button>' +
+        '</div>';
+
+      if (showSplit){
+        const uid = Array.from(selectedWordUids)[0];
+        document.getElementById("splitTokenBtn").onclick = () => splitWordToken(uid);
+      }
+      document.getElementById("createTagBtn").onclick = () => {
+        const tagName = document.getElementById("newTagName").value;
+        const type = document.getElementById("newTagType").value.trim().toUpperCase();
+        if (!type){ alert("Enter an entity type."); return; }
+        createAnnotationFromSelection(tagName, type);
+      };
+      document.getElementById("clearSelBtn").onclick = () => { selectedWordUids.clear(); render(); };
+
+    } else if (mergeModeFirstUid !== null){
+      const el = uidMap.get(mergeModeFirstUid);
+      panel.innerHTML = '<div class="insp-empty">Merge mode active — click another annotation in the <em>same sentence</em> to merge with <strong>#' + (el ? escapeHtml(el.getAttribute("ID")) : "?") + '</strong>, or click it again to cancel.</div>';
+    } else {
+      panel.innerHTML = emptyInspectorHTML();
+    }
+  }
+
+  // ---------------- stats ----------------
+  function updateStats(){
+    const statsEl = document.getElementById("stats");
+    if (!xmlDoc){ statsEl.innerHTML = '<div class="insp-empty">No file loaded yet.</div>'; return; }
+    const names = tagNamesUpper();
+    // use already-built uidMap — no extra DOM scan needed
+    const byType = {};
+    let annCount = 0;
+    uidMap.forEach(el => {
+      if (el.nodeType === 1 && names.includes(el.tagName.toUpperCase())){
+        annCount++;
+        const t = (el.getAttribute("TYPE") || "UNSET").toUpperCase();
+        byType[t] = (byType[t]||0) + 1;
+      }
+    });
+    const typeRows = Object.entries(byType).sort((a,b)=>b[1]-a[1]).map(([t,c]) =>
+      '<div class="stat-row"><span><span class="dot" style="background:'+colorForType(t)+'"></span>'+escapeHtml(t)+'</span><span class="stat-count">'+c+'</span></div>'
+    ).join("");
+    statsEl.innerHTML =
+      '<div class="stat-row"><span>Files processed</span><span class="stat-count">'+filesProcessedCount+'</span></div>' +
+      '<div class="stat-row"><span>Annotations</span><span class="stat-count">'+annCount+'</span></div>' +
+      '<div class="stat-row"><span>Corrections logged</span><span class="stat-count">'+correctionLog.length+'</span></div>' +
+      '<div class="stat-row"><span>Validation flags</span><span class="stat-count">'+validationIssues.length+'</span></div>' +
+      '<div class="stat-divider"></div>' +
+      (typeRows || '<div class="insp-empty">No annotations yet.</div>');
+  }
+
+  // ---------------- validation ----------------
+  function sevIcon(sev){ return sev==="error" ? "\u26D4" : sev==="warn" ? "\u26A0\uFE0F" : "\uD83D\uDCA1"; }
+
+  function runValidation(){
+    validationIssues = [];
+    if (!xmlDoc){ renderValidationPanel(); updateStats(); return; }
+    const names = tagNamesUpper();
+
+    // collect annotations using specific tag queries — far cheaper than querySelectorAll("*")
+    const allAnn = names.flatMap(name => Array.from(xmlDoc.getElementsByTagName(name)));
+
+    const idMap = new Map();
+    const allowedUp = config.allowedTypes.map(x => x.toUpperCase());
+    allAnn.forEach(el => {
+      const id   = el.getAttribute("ID");
+      const type = el.getAttribute("TYPE");
+      const words = Array.from(el.children).filter(c => c.tagName.toUpperCase() === "W");
+
+      if (!id)
+        validationIssues.push({sev:"error", msg: el.tagName + " is missing an ID attribute", node: el});
+      else
+        idMap.set(id, (idMap.get(id)||0) + 1);
+
+      if (!type)
+        validationIssues.push({sev:"error", msg: el.tagName + " #" + (id||"?") + " is missing TYPE", node: el});
+      else if (allowedUp.length && !allowedUp.includes(type.toUpperCase()))
+        validationIssues.push({sev:"warn", msg: el.tagName + " #" + (id||"?") + " has non-standard TYPE \"" + type + "\"", node: el});
+
+      if (words.length === 0)
+        validationIssues.push({sev:"error", msg: el.tagName + " #" + (id||"?") + " is empty (no words inside)", node: el});
+
+      // check for nested annotations (use children only, not deep querySelectorAll)
+      const nestedAnn = Array.from(el.children).filter(c => names.includes(c.tagName.toUpperCase()));
+      if (nestedAnn.length > 0)
+        validationIssues.push({sev:"error", msg: el.tagName + " #" + (id||"?") + " contains nested annotation", node: el});
+    });
+
+    idMap.forEach((count, id) => {
+      if (count > 1) validationIssues.push({sev:"error", msg: "Duplicate ID \"" + id + "\" used on " + count + " annotations", node: null});
+    });
+
+    // missing-tag heuristic — opt-in only (can be slow on large files)
+    if (document.getElementById("chkHeuristic") && document.getElementById("chkHeuristic").checked){
+      const numberWords = new Set(["एक","दोन","तीन","चार","पाच","सहा","सात","आठ","नऊ","दहा","अकरा","बारा","तेरा","चौदा","पंधरा","सोळा","सतरा","अठरा","एकोणीस","वीस","तीस","चाळीस","पन्नास","साठ","सत्तर","ऐंशी","नव्वद","शंभर","हजार","लाख","कोटी"]);
+      const numRegex = /[0-9०-९]/;
+      Array.from(xmlDoc.getElementsByTagName("W")).forEach(w => {
+        if (names.includes(w.parentNode.tagName.toUpperCase())) return;
+        const t = w.textContent.trim();
+        if (numRegex.test(t) || numberWords.has(t))
+          validationIssues.push({sev:"suggest", msg: "Possible missing tag on word \"" + t + "\"", node: w});
+      });
+    }
+
+    renderValidationPanel();
+    updateStats();
+  }
+
+  function renderValidationPanel(){
+    const v = document.getElementById("validation");
+    if (!xmlDoc){ v.innerHTML = '<div class="insp-empty">Load a file to see checks.</div>'; return; }
+    if (validationIssues.length === 0){ v.innerHTML = '<div class="insp-empty good">No issues found.</div>'; return; }
+    v.innerHTML = validationIssues.map(iss => {
+      const uid = iss.node ? nodeToUid.get(iss.node) : null;
+      return '<div class="val-item val-' + iss.sev + '" ' + (uid?('data-jump="'+uid+'"'):'') + '>' + sevIcon(iss.sev) + ' ' + escapeHtml(iss.msg) + '</div>';
+    }).join("");
+    v.querySelectorAll("[data-jump]").forEach(el => {
+      el.addEventListener("click", () => {
+        const target = document.querySelector('.word[data-uid="'+el.dataset.jump+'"], .annotation[data-uid="'+el.dataset.jump+'"]');
+        if (target){
+          target.scrollIntoView({behavior:"smooth", block:"center"});
+          target.classList.add("flash");
+          setTimeout(() => target.classList.remove("flash"), 1200);
+        }
+      });
+    });
+  }
+
+  // ---------------- export ----------------
+  function prettyPrintXML(xml){
+    const PADDING = "  ";
+    xml = xml.replace(/(>)(<)(\/*)/g, "$1\n$2$3");
+    let pad = 0;
+    return xml.split("\n").map(line => {
+      let indent = 0;
+      if (line.match(/.+<\/\w[^>]*>$/)) indent = 0;
+      else if (line.match(/^<\/\w/)) { pad = Math.max(pad-1, 0); }
+      else if (line.match(/^<\w[^>]*[^\/]>.*$/) && !line.match(/<\?xml/)) indent = 1;
+      else indent = 0;
+      const padding = PADDING.repeat(pad);
+      pad += indent;
+      return padding + line;
+    }).join("\n");
+  }
+
+  function downloadText(content, filename, mime){
+    const blob = new Blob([content], {type: mime});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function exportXML(){
+    if (!xmlDoc){ alert("No file loaded."); return; }
+    const str = new XMLSerializer().serializeToString(xmlDoc);
+    const pretty = prettyPrintXML(str);
+    const base = currentFileName.replace(/\.xml$/i, "");
+    downloadText(pretty, base + "_corrected.xml", "application/xml");
+    log("Exported corrected XML file");
+  }
+
+  function exportLog(){
+    const data = JSON.stringify({ file: currentFileName, exportedAt: new Date().toISOString(), corrections: correctionLog }, null, 2);
+    const base = (currentFileName || "session").replace(/\.xml$/i, "");
+    downloadText(data, base + "_log.json", "application/json");
+  }
+
+  // ---------------- sample ----------------
+  const SAMPLE_XML =
+'<DOC>\n' +
+'  <Sentence ID="1">\n' +
+'    <W>तो</W>\n' +
+'    <NUMEX ID="31" TYPE="QUANTITY"><W>रंगाचे,</W><W>२०-४०</W><W>सेमी</W></NUMEX>\n' +
+'    <W>लांब</W>\n' +
+'    <W>होता</W>\n' +
+'    <W>.</W>\n' +
+'  </Sentence>\n' +
+'  <Sentence ID="2">\n' +
+'    <W>एक</W>\n' +
+'    <W>माणूस</W>\n' +
+'    <W>आला</W>\n' +
+'    <W>.</W>\n' +
+'  </Sentence>\n' +
+'  <Sentence ID="3">\n' +
+'    <NUMEX ID="39" TYPE="QUANTITY"><W>१०</W><W>वर्षांनंतर</W></NUMEX>\n' +
+'    <W>तो</W>\n' +
+'    <W>परतला</W>\n' +
+'    <W>.</W>\n' +
+'  </Sentence>\n' +
+'  <Sentence ID="4">\n' +
+'    <NUMEX ID="42" TYPE="COUNT"><W>५</W></NUMEX>\n' +
+'    <W>किलो</W>\n' +
+'    <NUMEX ID="50" TYPE="EMPTYCHECK"></NUMEX>\n' +
+'  </Sentence>\n' +
+'  <Sentence ID="5">\n' +
+'    <W>उच्च</W>\n' +
+'    <W>तेलाचे</W>\n' +
+'    <W>प्रमाण</W>\n' +
+'    <NUMEX ID="146" TYPE="COUNT"><W>(७०</W><W>ते</W><W>७२%).</W></NUMEX>\n' +
+'  </Sentence>\n' +
+'</DOC>';
+
+  // ---------------- localStorage auto-save ----------------
+  function getSentenceKey(containerEl, idx){
+    const isRoot = (containerEl === xmlDoc.documentElement);
+    return isRoot ? "DOCUMENT" : (containerEl.tagName + (containerEl.getAttribute("ID") || String(idx+1)));
+  }
+
+  function autoSave(){
+    if (!xmlDoc) return;
+    try {
+      const xmlStr = new XMLSerializer().serializeToString(xmlDoc);
+      const payload = {
+        fileName: currentFileName,
+        savedAt: new Date().toISOString(),
+        correctionsCount: correctionLog.length,
+        sentenceProgress,
+        correctionLog: correctionLog.slice(0, 500),
+        xmlStr
+      };
+      localStorage.setItem(LS_KEY, JSON.stringify(payload));
+      // flash the dot
+      const dot = document.getElementById("autosaveDot");
+      dot.classList.add("flash");
+      setTimeout(() => dot.classList.remove("flash"), 1000);
+    } catch(e){ /* storage full or unavailable */ }
+  }
+
+  function scheduleAutoSave(){
+    if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+    _autoSaveTimer = setTimeout(autoSave, 800);
+  }
+
+  function clearSavedSession(){
+    try { localStorage.removeItem(LS_KEY); } catch(e){}
+  }
+
+  function checkForSavedSession(){
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return;
+      const payload = JSON.parse(raw);
+      if (!payload.xmlStr) return;
+      const savedAt = new Date(payload.savedAt);
+      const meta = document.getElementById("restoreMeta");
+      const done = Object.values(payload.sentenceProgress||{}).filter(s=>s==="done").length;
+      const total = Object.keys(payload.sentenceProgress||{}).length;
+      meta.textContent =
+        "File: " + payload.fileName +
+        " · Saved: " + savedAt.toLocaleString() +
+        " · " + (payload.correctionsCount||0) + " corrections" +
+        (total ? " · " + done + "/" + total + " sentences done" : "");
+      document.getElementById("restoreBanner").classList.add("visible");
+    } catch(e){}
+  }
+
+  function restoreSession(){
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return;
+      const payload = JSON.parse(raw);
+      currentFileName = payload.fileName || "restored.xml";
+      document.getElementById("fileNameLabel").textContent = currentFileName;
+      sentenceProgress = payload.sentenceProgress || {};
+      correctionLog = payload.correctionLog || [];
+      renderLog();
+      loadXMLString(payload.xmlStr);
+    } catch(e){ alert("Could not restore session: " + e.message); }
+  }
+
+  // heartbeat save every 30 seconds
+  setInterval(() => { if (xmlDoc) autoSave(); }, 30000);
+
+  // ---------------- progress tracker ----------------
+  function getSentenceStatus(key){ return sentenceProgress[key] || "none"; }
+
+  function cycleSentenceStatus(key){
+    const cur = getSentenceStatus(key);
+    const next = cur === "none" ? "inprogress" : cur === "inprogress" ? "done" : "none";
+    sentenceProgress[key] = next;
+    // update just this sentence block without full re-render
+    const allBlocks = document.querySelectorAll('.sentence-block');
+    const block = Array.from(allBlocks).find(b => b.dataset.key === key) || null;
+    if (block){
+      block.dataset.status = next;
+      const btn = block.querySelector(".status-btn");
+      if (btn) btn.textContent = statusIcon(next);
+    }
+    updateProgressBar();
+    scheduleAutoSave();
+  }
+
+  function statusIcon(s){
+    return s === "done" ? "✅" : s === "inprogress" ? "🔄" : "⬜";
+  }
+
+  function updateProgressBar(){
+    if (!xmlDoc){ document.getElementById("progressWrap").classList.remove("visible"); return; }
+    const keys = Object.keys(sentenceProgress);
+    // count all sentence blocks
+    const blocks = document.querySelectorAll(".sentence-block[data-key]");
+    const total = blocks.length;
+    if (total === 0){ document.getElementById("progressWrap").classList.remove("visible"); return; }
+    const done = Array.from(blocks).filter(b => b.dataset.status === "done").length;
+    const inprog = Array.from(blocks).filter(b => b.dataset.status === "inprogress").length;
+    document.getElementById("progressWrap").classList.add("visible");
+    document.getElementById("progressLabel").textContent =
+      "✅ " + done + " done   🔄 " + inprog + " in progress   ⬜ " + (total - done - inprog) + " not reviewed   (total: " + total + ")";
+    document.getElementById("progressFill").style.width = Math.round((done/total)*100) + "%";
+  }
+
+  // ---------------- wiring ----------------
+  document.getElementById("fileInput").addEventListener("change", function(e){
+    const file = e.target.files[0]; if (!file) return;
+    currentFileName = file.name;
+    document.getElementById("fileNameLabel").textContent = file.name;
+    sentenceProgress = {};
+    const reader = new FileReader();
+    reader.onload = ev => { loadXMLString(ev.target.result); autoSave(); };
+    reader.readAsText(file);
+  });
+
+  document.getElementById("loadPasteBtn").addEventListener("click", function(){
+    const v = document.getElementById("pasteArea").value;
+    if (!v.trim()){ alert("Paste some XML first."); return; }
+    currentFileName = "pasted.xml";
+    document.getElementById("fileNameLabel").textContent = "pasted.xml";
+    sentenceProgress = {};
+    loadXMLString(v);
+    autoSave();
+  });
+
+  document.getElementById("loadSampleBtn").addEventListener("click", function(){
+    currentFileName = "sample.xml";
+    document.getElementById("fileNameLabel").textContent = "sample.xml (demo)";
+    sentenceProgress = {};
+    loadXMLString(SAMPLE_XML);
+  });
+
+  document.getElementById("exportXmlBtn").addEventListener("click", function(){
+    exportXML();
+    if (xmlDoc){
+      const clear = confirm("Export complete!\n\nDo you want to clear the saved session from this browser?\n\n• Click OK to clear (you're fully done with this file)\n• Click Cancel to keep it (you may want to continue editing later)");
+      if (clear) clearSavedSession();
+    }
+  });
+  document.getElementById("exportLogBtn").addEventListener("click", exportLog);
+
+  document.getElementById("applyCfgBtn").addEventListener("click", function(){
+    const tagNames = document.getElementById("cfgTagNames").value.split(",").map(s=>s.trim()).filter(Boolean);
+    const types = document.getElementById("cfgTypes").value.split(",").map(s=>s.trim()).filter(Boolean);
+    if (tagNames.length) config.tagNames = tagNames;
+    if (types.length) config.allowedTypes = types.map(t=>t.toUpperCase());
+    render(); runValidationDebounced(); scheduleAutoSave();
+    log("Settings updated — tags: [" + config.tagNames.join(", ") + "]");
+  });
+
+  document.getElementById("restoreYesBtn").addEventListener("click", function(){
+    document.getElementById("restoreBanner").classList.remove("visible");
+    restoreSession();
+  });
+  document.getElementById("restoreNoBtn").addEventListener("click", function(){
+    clearSavedSession();
+    document.getElementById("restoreBanner").classList.remove("visible");
+  });
+
+  // check for saved session on startup
+  checkForSavedSession();
+
+  // initial paint
+  render();
+  renderLog();
+})();
+</script>
+</body>
+</html>
